@@ -1,4 +1,13 @@
-// Adapted from linux kernel
+/* SPDX-License-Identifier: GPL-2.0 */
+
+/*
+ * Adapted from linux kernel
+ *
+ * Remove WRITE_ONCE/READ_ONCE defs
+ * Added some other defines to make this compile
+ * Moved list struct defs to utils/listdef.h
+ *
+ */
 
 #ifndef _UTILS_LIST_H
 #define _UTILS_LIST_H
