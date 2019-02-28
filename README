@@ -1,0 +1,7 @@
+bf-comp
+
+This defines a high-level language which compiles to bf. 
+
+Some of the features include the following:
+  * Variable constructs defined within scopes
+  * If/Else/While/For blocks

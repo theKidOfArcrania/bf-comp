@@ -1,0 +1,13 @@
+build-aux
+**/.*.sw?
+autom4te.cache
+**/*.log
+configure
+config.status
+**/Makefile
+**/Makefile.in
+**/*.a
+**/*.o
+**/.deps
+aclocal.m4
+**/test*
