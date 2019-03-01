@@ -37,7 +37,7 @@ static int logCount[4];
 static void nextLine() {
   if (src) {
     ssize_t read = getline(&line, &lineLen, src);
-    if (errno != 0)
+    if (read < 0 && errno)
       gerror("getline() failed: %s", strerror(errno));
     line[(read == -1) ? 0 : read - 1] = 0;
   } else if (lineLen) {
@@ -65,6 +65,18 @@ static void updateSourceLocation(const char* newSourceFile, int newLinenum) {
     nextLine();
   }
 }
+
+/*
+void error_free() {
+  free(sourceFile);
+  sourceFile = NULL;
+  fclose(src);
+  src = NULL;
+  free(line);
+  line = NULL;
+  lineLen = 0;
+}
+*/
 
 int errors() {
   return logCount[MSG_ERROR] + logCount[MSG_FATAL];
@@ -115,7 +127,7 @@ void printMsg(enum msgType type, const YYLTYPE* loc, const char* fmt, ...) {
     //FIXME: buffer/stack overflow!!!
     char buff[cols + 20];
     memset(buff, ' ', cols);
-    strcpy(buff + cols, cYEL"^"cRST"\n");
+    strcpy(buff + cols, cYEL "^" cRST"\n");
     puts(buff);
   }
 

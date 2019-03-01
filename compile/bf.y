@@ -36,9 +36,9 @@ typedef struct _IO_FILE FILE;
 
 struct parse_env {
   FILE *infile;
-  const char *current_file;
+  char *current_file;
   yyscan_t scanner;    
-  struct list_head ast;
+  struct list_head *ast;
 };
 
 #define YYLTYPE YYLTYPE
@@ -83,6 +83,10 @@ extern int yyparse(struct parse_env *, yyscan_t);
   }                                           \
 } while (0)
 
+static inline void list_new(struct list_head **phead) {
+  INIT_LIST_HEAD(*phead = malloc_c(sizeof(**phead)));
+}
+
 }
 
 %locations
@@ -95,8 +99,7 @@ extern int yyparse(struct parse_env *, yyscan_t);
   char ch;
   int32_t num;
   char *str;
-  struct var var;
-  struct list_head stmts;
+  struct list_head *stmts;
 }
 
 %token T_EOF 0 "end of file"
@@ -106,7 +109,7 @@ extern int yyparse(struct parse_env *, yyscan_t);
 %token <str> T_IDEN T_CODE
 
 %type <stmts> stmts stmt
-%type <var> var
+%type <ch> tmpable
 
 %%
 
@@ -115,88 +118,94 @@ main: stmts {
     };
 
 stmts: stmts stmt {
-      INIT_LIST_HEAD(&$$);
-      list_splice_tail(&$1, &$$);
+      $$ = $1;
+      list_splice_tail($2, $$);
+      free($2);
      } | %empty {
-      INIT_LIST_HEAD(&$$);
+      list_new(&$$);
      }
      ;
 
 stmt: T_CODE {
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_literal, &@1, cstr_new_smv($1));
-    } | T_IF var T_THEN stmts T_END T_IF {
-      INIT_LIST_HEAD(&$$);
+      list_new(&$$);
+      s_add($$, stmt_literal, &@1, cstr_new_smv($1));
+    } | T_IF tmpable T_IDEN T_THEN stmts T_END T_IF {
+      list_new(&$$);
 
-      char *var = $2.iden;
-      if (!$2.is_temp)
-        var = stmts_var_maketemp(&$$, &@2, var);
+      char *var = $3;
+      if (!$2)
+        var = stmts_var_maketemp($$, &@3, var);
 
       // if [var] then { [var] = 0; }
-      s_add(&$$, stmt_atvar, &@2, var);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("[[-]")); 
-      s_add(&$$, stmt_pushctx, &@3);
-      list_splice_tail(&$4, &$$);
-      s_add(&$$, stmt_popctx, &@3);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("]"));
-    } | T_IF var T_THEN stmts T_ELSE stmts T_END T_IF {
-      char *var = $2.iden, *var2;
+      s_add($$, stmt_atvar, &@3, var);
+      s_add($$, stmt_literal, &@3, cstr_new_scp("[[-]")); 
+      s_add($$, stmt_pushctx, &@3);
+      list_splice_tail($5, $$);
+      free($5);
+      s_add($$, stmt_popctx, &@6);
+      s_add($$, stmt_literal, &@6, cstr_new_scp("]"));
+    } | T_IF tmpable T_IDEN T_THEN stmts T_ELSE stmts T_END T_IF {
+      char *var = $3, *var2;
 
-      INIT_LIST_HEAD(&$$);
-      if (!$2.is_temp)
-        var = stmts_var_maketemp(&$$, &@2, var);
+      list_new(&$$);
+      if (!$2)
+        var = stmts_var_maketemp($$, &@3, var);
 
       // [var2] = 1
-      var2 = stmts_tmpvar(&$$, &@2, 1);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("+"));
+      var2 = stmts_tmpvar($$, &@3, 1);
+      s_add($$, stmt_literal, &@3, cstr_new_scp("+"));
 
       // if [var] then { [var] = 0; [var2]--; if_stmts; }
-      s_add(&$$, stmt_atvar, &@2, var);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("[[-]")); 
-      s_add(&$$, stmt_atvar, &@2, var2);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("-")); 
-      s_add(&$$, stmt_pushctx, &@3);
-      list_splice_tail(&$4, &$$);
-      s_add(&$$, stmt_popctx, &@3);
-      s_add(&$$, stmt_atvar, &@2, strdup_c(var));
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("]"));
-      s_add(&$$, stmt_delvar, &@2, strdup_c(var));
+      s_add($$, stmt_atvar, &@3, var);
+      s_add($$, stmt_literal, &@3, cstr_new_scp("[[-]")); 
+      s_add($$, stmt_atvar, &@3, var2);
+      s_add($$, stmt_literal, &@3, cstr_new_scp("-")); 
+      s_add($$, stmt_pushctx, &@3);
+      list_splice_tail($5, $$);
+      free($5);
+      s_add($$, stmt_popctx, &@6);
+      s_add($$, stmt_atvar, &@6, strdup_c(var));
+      s_add($$, stmt_literal, &@6, cstr_new_scp("]"));
+      s_add($$, stmt_delvar, &@6, strdup_c(var));
 
       // if [var2] { else_stmts; }
-      s_add(&$$, stmt_atvar, &@2, strdup_c(var2));
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("["));
-      s_add(&$$, stmt_pushctx, &@5);
-      list_splice_tail(&$6, &$$);
-      s_add(&$$, stmt_popctx, &@5);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("]"));
-      s_add(&$$, stmt_delvar, &@2, strdup_c(var2));
-    } | T_WHILE var stmts T_END T_WHILE {
-      char *var = $2.iden;
+      s_add($$, stmt_atvar, &@6, strdup_c(var2));
+      s_add($$, stmt_literal, &@6, cstr_new_scp("["));
+      s_add($$, stmt_pushctx, &@6);
+      list_splice_tail($7, $$);
+      free($7);
+      s_add($$, stmt_popctx, &@6);
+      s_add($$, stmt_literal, &@8, cstr_new_scp("]"));
+      s_add($$, stmt_delvar, &@8, strdup_c(var2));
+    } | T_WHILE tmpable T_IDEN stmts T_END T_WHILE {
+      char *var = $3;
 
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_atvar, &@2, var);
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("["));
-      s_add(&$$, stmt_pushctx, &@3);
-      list_splice_tail(&$3, &$$);
-      s_add(&$$, stmt_popctx, &@3);
-      s_add(&$$, stmt_atvar, &@2, strdup_c(var));
-      s_add(&$$, stmt_literal, &@2, cstr_new_scp("]"));
-      if ($2.is_temp)
-        s_add(&$$, stmt_delvar, &@2, strdup_c(var));
+      list_new(&$$);
+      s_add($$, stmt_atvar, &@3, var);
+      s_add($$, stmt_literal, &@3, cstr_new_scp("["));
+      s_add($$, stmt_pushctx, &@3);
+      list_splice_tail($4, $$);
+      free($4);
+      s_add($$, stmt_popctx, &@5);
+      s_add($$, stmt_atvar, &@5, strdup_c(var));
+      s_add($$, stmt_literal, &@5, cstr_new_scp("]"));
+      if ($2)
+        s_add($$, stmt_delvar, &@5, strdup_c(var));
 
     } | T_FOR T_IDEN T_FROM expr T_TO expr stmts T_END T_FOR {
       lerror(&@1, "For loops not supported yet...");
     } | T_AT T_IDEN {
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_atvar, &@2, $2);
+      list_new(&$$);
+      s_add($$, stmt_atvar, &@2, $2);
     } | T_LET stmts T_END T_LET {
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_pushctx, &@1);
-      list_splice_tail(&$2, &$$);
-      s_add(&$$, stmt_popctx, &@1);
+      list_new(&$$);
+      s_add($$, stmt_pushctx, &@1);
+      list_splice_tail($2, $$);
+      free($2);
+      s_add($$, stmt_popctx, &@1);
     } | T_DIM T_IDEN {
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_pushvar, &@2, $2);
+      list_new(&$$);
+      s_add($$, stmt_pushvar, &@2, $2);
     } | T_NUM { 
       char *ch;
       int pos = $1 & 0xff; 
@@ -211,15 +220,13 @@ stmt: T_CODE {
         ch[neg] = 0;
       }
 
-      INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_literal, &@1, cstr_new_smv(ch));
+      list_new(&$$);
+      s_add($$, stmt_literal, &@1, cstr_new_smv(ch));
     }
     ;
 
-expr: var | T_NUM
+expr: tmpable T_IDEN | T_NUM
 
-var: T_IDEN { $$ = (var){.iden = $1, .is_temp = 0}; }
-   | T_TEMP T_IDEN { $$ = (var){.iden = $2, .is_temp = 1}; }
-   ;
+tmpable: T_TEMP { $$ = 1; } | %empty { $$ = 0; } ;
 
 %%

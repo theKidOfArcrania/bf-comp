@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "compile/ast.h"
+#include "utils/cstr.h"
 #include "utils/list.h"
 #include "utils/checkmem.h"
 #include "utils/errhand.h"
@@ -61,11 +62,25 @@ stmt *stmt_atvar(const YYLTYPE* loc, char *iden) {
 }
 
 stmt *stmt_pushctx(const YYLTYPE* loc) {
-  return STMT_NONE(STMT_PUSHVAR, loc);
+  return STMT_NONE(STMT_PUSHCTX, loc);
 }
 
 stmt *stmt_popctx(const YYLTYPE* loc) {
   return STMT_NONE(STMT_POPCTX, loc);
+}
+
+void stmt_delete(stmt *s) {
+  switch (s->type) {
+    case STMT_LITERAL: cstr_delete(s->d.literal); break;
+    case STMT_PUSHVAR: free(s->d.ptr); break;
+    case STMT_POPVAR: free(s->d.ptr); break;
+    case STMT_ATVAR: free(s->d.ptr); break;
+    case STMT_DELVAR: free(s->d.ptr); break;
+    case STMT_PUSHCTX:
+    case STMT_POPCTX: break;
+    default: gerror("switch error");
+  }
+  free(s);
 }
 
 void s_add_literal(struct list_head *stmts, const YYLTYPE* loc, char *lit) {
@@ -98,10 +113,12 @@ char *stmts_tmpvar(struct list_head *stmts, const YYLTYPE* loc, int is_zero) {
   return temp;
 }
 
-char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, const char *iden) {
+char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, char *iden) {
   char *temp1 = nexttmp(), *temp2 = nexttmp();
 
-  s_add(stmts, stmt_atvar, loc, strdup_c(iden));
+  s_add(stmts, stmt_pushvar, loc, strdup_c(temp1));
+  s_add(stmts, stmt_pushvar, loc, strdup_c(temp2));
+  s_add(stmts, stmt_atvar, loc, iden);
   s_add(stmts, stmt_literal, loc, cstr_new_scp("[-"));
   s_add(stmts, stmt_atvar, loc, strdup_c(temp1));
   s_add(stmts, stmt_literal, loc, cstr_new_scp("+"));
@@ -118,4 +135,16 @@ char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, const char
   s_add(stmts, stmt_literal, loc, cstr_new_scp("]"));
 
   return temp1;
+}
+
+void stmts_delete(struct list_head *stmts) {
+  struct list_head *node;
+  if (!list_empty(stmts)) {
+    list_for_each(node, stmts) {
+      if (node->prev != stmts)
+        stmt_delete(stmt_ent(node->prev));
+    }
+    stmt_delete(stmt_ent(node->prev));
+  }
+  free(stmts);
 }

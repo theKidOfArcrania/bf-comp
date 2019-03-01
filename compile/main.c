@@ -27,63 +27,83 @@
 
 #include "compile/bf.h"
 #include "compile/bf_lex.h"
+#include "compile/il_parser.h"
 #include "utils/errhand.h"
 #include "utils/checkmem.h"
 #include "utils/list.h"
 
 #define min(a, b) ((a) > (b) ? (b) : (a))
 
-FILE *next_file();
+int next_file(struct parse_env *penv);
 void parse_args(int argc, char **argv);
+int parse_bfc(struct parse_env *penv);
 
 static char **files;
-static char *current_file;
 
 int main(int argc, char **argv) {
-  yyscan_t scanner;
-  FILE *infile;
-
   parse_args(argc, argv);
 
-  yylex_init(&scanner);
-
-
-  if (!(infile = next_file()))
-    gfatal("no input files!");
-  yyset_in(infile, scanner);
+  struct parse_env penv;
+  memset(&penv, 0, sizeof(penv));
 
   while (1) {
-    struct parse_env penv;
-    penv.current_file = current_file;
-    switch (yyparse(&penv, scanner)) {
-      case 1:
-        gfatal("exiting because of previous error.");
-        __builtin_unreachable();
-      case 2:
-        gfatal("memory exhausted!");
-        __builtin_unreachable();
-    }
+    int error_before = errors();
+    cstr *s = NULL;
 
-    fclose(infile);
-    yypop_buffer_state(scanner);
+    if (!parse_bfc(&penv))
+      break;
+    
+    if (error_before != errors())
+      goto clean;
 
-    FILE *next = next_file();
-    if (!next) break;
+    dump_il(penv.ast, stdout);
+    s = compile_il(penv.ast);
+    if (error_before != errors())
+      goto clean;
+    
+    puts(s->str);
+    cstr_delete(s);
 
-    YY_BUFFER_STATE buff = yy_create_buffer(next, YY_BUF_SIZE, scanner);
-    yy_switch_to_buffer(buff, scanner);
+clean:
+    if (s) cstr_delete(s);
+    if (penv.ast) stmts_delete(penv.ast);
   }
+
+  if (penv.scanner)
+    yylex_destroy(penv.scanner);
 }
 
-void parse_bfc() {}
+int parse_bfc(struct parse_env *penv) {
+  if (!penv->scanner) {
+    yylex_init(&penv->scanner);
 
-FILE *next_file() {
-  FILE* f = NULL;
-  while (!f && *files) {
+    if (!next_file(penv))
+      gfatal("no input files");
+    yyset_in(penv->infile, penv->scanner);
+  } else {
+    if (!next_file(penv))
+      return 0;
+    YY_BUFFER_STATE buff = yy_create_buffer(penv->infile, YY_BUF_SIZE, penv->scanner);
+    yy_switch_to_buffer(buff, penv->scanner);
+  }
+
+  switch (yyparse(penv, penv->scanner)) {
+    case 1:
+      return 1;
+    case 2:
+      gfatal("memory exhausted");
+  }
+
+  fclose(penv->infile);
+  yypop_buffer_state(penv->scanner);
+  return 1;
+}
+
+int next_file(struct parse_env *penv) {
+  if (penv->current_file)
+    free(penv->current_file);
+  while (*files) {
     const char* file = *(files++);
-    if (current_file)
-      free(current_file);
-    current_file = strdup_c(file);
 
     int fd = open(file, O_RDONLY);
     if (fd < 0) {
@@ -102,9 +122,11 @@ FILE *next_file() {
       continue;
     }
 
-    f = fdopen(fd, "r");
+    penv->current_file = strdup_c(file);
+    penv->infile = fdopen(fd, "r");
+    return 1;
   }
-  return f;
+  return 0;
 }
 
 void usage() {

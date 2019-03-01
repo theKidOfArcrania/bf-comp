@@ -52,10 +52,11 @@ static void updateLocation(YYLTYPE *loc, char *tok);
   errno = 0;
   long int num = strtol(yytext, &end, 10);
   if (errno || *end) {
-    lwarning(yylloc, "Number overflowed!");
+    lwarning(yylloc, "number overflowed!");
+    errno = 0;
     num = 0;
   } else if ((num % 256) != num) {
-    lwarning(yylloc, "Number is not in the range -256 to 256.");
+    lwarning(yylloc, "number is not in the range -256 to 256.");
     num %= 256;
   }
 
@@ -89,7 +90,7 @@ TEMP  { return T_TEMP; }
 
 LET   { return T_LET; }
 
-[A-Za-z_][A-Za-z0-9]* { 
+[A-Za-z_][A-Za-z0-9_]* { 
   yylval->str = strdup_c(yytext);
   return T_IDEN; 
 }

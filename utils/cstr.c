@@ -23,7 +23,7 @@
 #include "utils/cstr.h"
 
 #define DEF_CSTR_CAP 0x10
-#define grow(l) ((l) + (l >> 2))
+#define grow(l) ((l) + ((l) >> 2))
 
 cstr *cstr_new() {
   return cstr_new_i(DEF_CSTR_CAP);
@@ -41,9 +41,10 @@ cstr *cstr_new_scp(const char *str) {
   cstr *s = malloc_c(sizeof(*s));
   
   size_t len = strlen(str);
-  size_t cap = grow(len);
+  size_t cap = grow(len + 1);
   
   s->str = malloc_c(cap);
+  s->str[len] = 0;
   memcpy(s->str, str, len);
 
   s->cap = cap;
@@ -56,13 +57,14 @@ cstr *cstr_new_smv(char *str) {
   
   size_t len = strlen(str);
   s->str = str;
-  s->length = s->cap = len;
+  s->length = len;
+  s->cap = len + 1;
   return s;
 }
 
 void cstr_append_carr(cstr *s, const char *arr, size_t clen) {
   size_t newlen = s->length + clen;
-  if (newlen > s->cap) {
+  if (newlen >= s->cap) {
     size_t newcap = grow(s->cap);
     if (newlen >= newcap)
       newcap = newlen + 1;
@@ -72,6 +74,7 @@ void cstr_append_carr(cstr *s, const char *arr, size_t clen) {
   }
 
   memcpy(s->str + s->length, arr, clen);
+  s->str[newlen] = 0;
   s->length = newlen;
 }
 
@@ -94,7 +97,7 @@ int cstr_insert_carr(cstr *s, size_t ind, const char *arr, size_t clen) {
 
 
   size_t newlen = s->length + clen;
-  if (newlen > s->cap) {
+  if (newlen >= s->cap) {
     size_t newcap = grow(s->cap);
     if (newlen >= newcap)
       newcap = newlen + 1;
@@ -106,6 +109,7 @@ int cstr_insert_carr(cstr *s, size_t ind, const char *arr, size_t clen) {
   if (ind < s->length)
     memmove(s->str + ind, s->str + ind + clen, s->length - ind);
   memcpy(s->str + ind, arr, clen);
+  s->str[newlen] = 0;
   s->length = newlen;
   return 1;
 }

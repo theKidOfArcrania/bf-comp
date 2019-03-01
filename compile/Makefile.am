@@ -22,7 +22,7 @@ BUILT_SOURCES = bf.h bf_lex.h
 AM_YFLAGS = -d
 AM_LFLAGS = --header-file=bf_lex.h
 libcompile_a_CPPFLAGS = -I.. $(WARN_CPPFLAGS)
-libcompile_a_SOURCES = bf.y bf_lex.l ast.c main.c
+libcompile_a_SOURCES = bf.y bf_lex.l ast.c main.c il_parser.c
 MOSTLYCLEANFILES = bf.h bf_lex.h
 
 # Recover from removal of header.

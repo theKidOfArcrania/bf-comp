@@ -25,7 +25,7 @@
 
 #define stmt_ent(ptr) list_entry((ptr), struct stmt, stmts)
 
-#define s_add(s, stmt_fn, ...) list_add(&stmt_fn(__VA_ARGS__)->stmts, (s))
+#define s_add(s, stmt_fn, ...) list_add_tail(&stmt_fn(__VA_ARGS__)->stmts, (s))
 
 
 enum stmt_types {
@@ -60,10 +60,12 @@ stmt *stmt_delvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_popvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_atvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_pushctx(const YYLTYPE* loc);
-stmt *stmt_popctx(const YYLTYPE* loc); // TODO: must restore variable stack and tape ptr
+stmt *stmt_popctx(const YYLTYPE* loc);
+void stmt_delete(stmt *s);
 
 void s_add_literal(struct list_head *stmts, const YYLTYPE* loc, char *iden);
 
 char *stmts_tmpvar(struct list_head *stmts, const YYLTYPE* loc, int is_zero);
-char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, const char *iden);
+char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, char *iden);
+void stmts_delete(struct list_head *stmts);
 #endif

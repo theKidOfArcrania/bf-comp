@@ -118,7 +118,10 @@ int infos();
 #define lerror(loc, ...) printMsg(MSG_ERROR, (loc), __VA_ARGS__)
 #define lwarning(loc, ...) printMsg(MSG_WARNING, (loc), __VA_ARGS__)
 #define linfo(loc, ...) printMsg(MSG_INFO, (loc), __VA_ARGS__)
-#define gfatal(...) printMsg(MSG_FATAL, 0, __VA_ARGS__)
+#define gfatal(...) do { \
+  printMsg(MSG_FATAL, 0, __VA_ARGS__); \
+  __builtin_unreachable(); \
+} while(0)
 #define gerror(...) printMsg(MSG_ERROR, 0, __VA_ARGS__)
 #define gwarning(...) printMsg(MSG_WARNING, 0, __VA_ARGS__)
 #define ginfo(...) printMsg(MSG_INFO, 0, __VA_ARGS__)

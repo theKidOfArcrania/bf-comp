@@ -16,36 +16,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _UTILS_CHECKMEM_H
-#define _UTILS_CHECKMEM_H
+#ifndef _COMPILE_ILPARSER_H
+#define _COMPILE_ILPARSER_H
 
-#ifdef __cplusplus
-extern "C" 
-#endif
+#include "utils/cstr.h"
+#include "utils/listdef.h"
 
-#include <sys/types.h>
+typedef struct _IO_FILE FILE;
 
-#ifndef _UTILS_CHECKMEM_C
-
-#define BUILD_ERROR %%%
-#define malloc BUILD_ERROR
-#define calloc BUILD_ERROR
-#define realloc BUILD_ERROR
-#define strdup BUILD_ERROR
-#define memdup BUILD_ERROR
+cstr *compile_il(const struct list_head* ast);
+void dump_il(const struct list_head *ast, FILE *out);
 
 #endif
-
-
-
-void* malloc_c(size_t size);
-void* calloc_c(size_t nmemb, size_t size);
-void* realloc_c(void *ptr, size_t size);
-char* strdup_c(const char *s);
-void* memdup_c(const void *mem, size_t len);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif 
