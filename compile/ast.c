@@ -24,6 +24,7 @@
 #include "compile/ast.h"
 #include "utils/list.h"
 #include "utils/checkmem.h"
+#include "utils/errhand.h"
 
 #define STMT_PTR(t, l, p) ({ \
   stmt *__s = malloc_c(sizeof(stmt)); \
@@ -66,6 +67,16 @@ stmt *stmt_pushctx(const YYLTYPE* loc) {
 stmt *stmt_popctx(const YYLTYPE* loc) {
   return STMT_NONE(STMT_POPCTX, loc);
 }
+
+void s_add_literal(struct list_head *stmts, const YYLTYPE* loc, char *lit) {
+  if (stmt_ent(stmts->prev)->type == STMT_LITERAL) {
+    cstr_append_s(stmt_ent(stmts->prev)->d.literal, lit);
+    free(lit);
+  } else {
+    s_add(stmts, stmt_literal, loc, cstr_new_smv(lit));
+  }
+}
+
 
 static char *nexttmp() {
   static int nextvar = 0;

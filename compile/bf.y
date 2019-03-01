@@ -22,10 +22,24 @@
 #  include <stdint.h>
 #endif
 
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
+typedef void* yyscan_t;
+#endif
+
 #include "compile/ast.h"
-#include "utils/errhand.h"
+#include "utils/loc.h"
 #include "utils/cstr.h"
 #include "utils/listdef.h"
+
+typedef struct _IO_FILE FILE;
+
+struct parse_env {
+  FILE *infile;
+  const char *current_file;
+  yyscan_t scanner;    
+  struct list_head ast;
+};
 
 #define YYLTYPE YYLTYPE
 
@@ -34,12 +48,14 @@
 %initial-action {
   @$.last_line = @$.first_line = 1;
   @$.last_column = @$.first_column = 0;
-  @$.sourceFile = currentFile;
+  @$.sourceFile = env->current_file;
 }
 
 %code {
 
 #define _GNU_SOURCE
+
+#include "compile/bf_lex.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,15 +63,14 @@
 
 #include "utils/list.h"
 #include "utils/checkmem.h"
+#include "utils/errhand.h"
 
 #define YYMALLOC malloc_c
 
-extern const char *currentFile;
+extern int yylex(YYSTYPE*, YYLTYPE*, yyscan_t);
+extern int yyparse(struct parse_env *, yyscan_t);
 
-extern int yylex();
-extern int yylex();
-extern int yyparse();
-extern FILE *yyin;
+#define yyerror(ploc, unused, unused2, ...) printMsg(MSG_ERROR, ploc, __VA_ARGS__)
 
 #define YYLLOC_DEFAULT(Cur, Rhs, N) do {      \
   if (N) {                                    \
@@ -72,13 +87,15 @@ extern FILE *yyin;
 
 %locations
 %define parse.error verbose
+%define api.pure full
+%parse-param {struct parse_env *env}
+%param {void *scanner}
 
 %union {
   char ch;
   int32_t num;
   char *str;
-  cstr *cstr;
-  var var;
+  struct var var;
   struct list_head stmts;
 }
 
@@ -88,13 +105,13 @@ extern FILE *yyin;
 %token <num> T_NUM
 %token <str> T_IDEN T_CODE
 
-%type <cstr> literals literal
 %type <stmts> stmts stmt
 %type <var> var
 
 %%
 
 main: stmts {
+      env->ast = $1;
     };
 
 stmts: stmts stmt {
@@ -105,9 +122,9 @@ stmts: stmts stmt {
      }
      ;
 
-stmt: literals {
+stmt: T_CODE {
       INIT_LIST_HEAD(&$$);
-      s_add(&$$, stmt_literal, &@1, $1);
+      s_add(&$$, stmt_literal, &@1, cstr_new_smv($1));
     } | T_IF var T_THEN stmts T_END T_IF {
       INIT_LIST_HEAD(&$$);
 
@@ -168,7 +185,7 @@ stmt: literals {
         s_add(&$$, stmt_delvar, &@2, strdup_c(var));
 
     } | T_FOR T_IDEN T_FROM expr T_TO expr stmts T_END T_FOR {
-      yyerror("For loops not supported yet...");
+      lerror(&@1, "For loops not supported yet...");
     } | T_AT T_IDEN {
       INIT_LIST_HEAD(&$$);
       s_add(&$$, stmt_atvar, &@2, $2);
@@ -204,16 +221,5 @@ expr: var | T_NUM
 var: T_IDEN { $$ = (var){.iden = $1, .is_temp = 0}; }
    | T_TEMP T_IDEN { $$ = (var){.iden = $2, .is_temp = 1}; }
    ;
-
-literals: literals literal {
-          cstr_append_str($1, $2);
-          cstr_delete($2);
-          $$ = $1;
-          strdup_c("");
-        } | %empty { $$ = cstr_new(); }
-        ;
-
-literal: T_CODE { $$ = cstr_new_smv($1); }
-       ;
 
 %%

@@ -380,6 +380,9 @@ static inline void list_splice_tail_init(struct list_head *list,
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)
 
+#define container_of(ptr, type, member) \
+  ((type *)((ptr) - offsetof(type, member)))
+
 /**
  * list_first_entry - get the first element from a list
  * @ptr:	the list head to take the element from.

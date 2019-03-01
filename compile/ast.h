@@ -19,7 +19,7 @@
 #ifndef _COMPILE_AST_H
 #define _COMPILE_AST_H
 
-#include "utils/errhand.h"
+#include "utils/loc.h"
 #include "utils/cstr.h"
 #include "utils/listdef.h"
 
@@ -61,6 +61,8 @@ stmt *stmt_popvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_atvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_pushctx(const YYLTYPE* loc);
 stmt *stmt_popctx(const YYLTYPE* loc); // TODO: must restore variable stack and tape ptr
+
+void s_add_literal(struct list_head *stmts, const YYLTYPE* loc, char *iden);
 
 char *stmts_tmpvar(struct list_head *stmts, const YYLTYPE* loc, int is_zero);
 char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, const char *iden);

@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _GNU_SOURCE
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,6 +92,7 @@ void printMsg(enum msgType type, const YYLTYPE* loc, const char* fmt, ...) {
 
   logCount[type]++;
 
+  printf("%s: ", program_invocation_short_name);
   if (loc) {
     printf(cBRI"%s:%d:%d: %s%s"cRST": ", loc->sourceFile, loc->first_line, 
         loc->first_column, color, heading);

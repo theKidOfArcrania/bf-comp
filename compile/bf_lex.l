@@ -24,17 +24,19 @@
 
 #include "compile/bf.h"
 #include "utils/checkmem.h"
+#include "utils/errhand.h"
 
-#define YY_USER_ACTION updateLocation();
+#define YY_USER_ACTION updateLocation(yylloc, yytext);
 
-#define yyalloc malloc_c
-#define yyrealloc realloc_c
+#define yyalloc(size, ctx) malloc_c(size)
+#define yyrealloc(buf, size, ctx) realloc_c(buf, size)
 
-static void updateLocation();
+static void updateLocation(YYLTYPE *loc, char *tok);
 
 %}
 
-%option noyyalloc noyyrealloc noyywrap nounput noinput
+%option noyyalloc noyyrealloc noyywrap nounput noinput 8bit caseless
+%option reentrant bison-bridge warn bison-locations
 
 %x CMT_LINE
 
@@ -45,14 +47,19 @@ static void updateLocation();
   .  ;
 }
 
-[-][0-9]+ { 
+[-]?[0-9]+ { 
   char *end;
   errno = 0;
-  yylval.num = strtol(yytext, &end, 10);
+  long int num = strtol(yytext, &end, 10);
   if (errno || *end) {
-    yyerror("Not a valid integer.");
-    yylval.num = 0;
+    lwarning(yylloc, "Number overflowed!");
+    num = 0;
+  } else if ((num % 256) != num) {
+    lwarning(yylloc, "Number is not in the range -256 to 256.");
+    num %= 256;
   }
+
+  yylval->num = num;
   return T_NUM;
 }
 
@@ -60,7 +67,7 @@ static void updateLocation();
 
 "#"   { BEGIN(CMT_LINE); }
 
-[-+<>.,]+ { yylval.str = strdup_c(yytext); return T_CODE; }
+[-+<>.,]+ { yylval->str = strdup_c(yytext); return T_CODE; }
 
 
 IF    { return T_IF; }
@@ -83,18 +90,18 @@ TEMP  { return T_TEMP; }
 LET   { return T_LET; }
 
 [A-Za-z_][A-Za-z0-9]* { 
-  yylval.str = strdup_c(yytext);
+  yylval->str = strdup_c(yytext);
   return T_IDEN; 
 }
 
-.     { yyerror("Invalid character `%c'.", yytext[0]); }
+.     { lerror(yylloc, "Invalid character `%c'.", yytext[0]); }
 
 %%
 
-static void updateLocation() {
-  int linenum = yylloc.first_line = yylloc.last_line;
-  int colnum  = yylloc.first_column = yylloc.last_column + 1;
-  for (char* s = yytext; *s; s++) {
+void updateLocation(YYLTYPE *loc, char *tok) {
+  int linenum = loc->first_line = loc->last_line;
+  int colnum  = loc->first_column = loc->last_column + 1;
+  for (char* s = tok; *s; s++) {
     if (*s == '\n') {
       colnum = 1;
       linenum++;
@@ -104,8 +111,8 @@ static void updateLocation() {
         colnum = (colnum - 1 + 7) / 8 * 8 + 1;
     }
   }
-  yylloc.last_line   = linenum;
-  yylloc.last_column = colnum - 1;
-//  printf("%d:%d to %d:%d\n", yylloc.first_line, yylloc.first_column,
-//    yylloc.last_line, yylloc.last_column);
+  loc->last_line   = linenum;
+  loc->last_column = colnum - 1;
+//  printf("%d:%d to %d:%d\n", loc->first_line, loc->first_column,
+//    loc->last_line, loc->last_column);
 }

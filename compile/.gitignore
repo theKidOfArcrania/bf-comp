@@ -1,3 +1,5 @@
+libcompile_a-bf_lex.c
 bf_lex.c
+bf_lex.h
 bf.c
 bf.h

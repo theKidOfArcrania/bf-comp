@@ -17,6 +17,6 @@
 #
 SUBDIRS = compile utils
 
-bin_PROGRAMS = test
-test_SOURCES = test.c
-test_LDADD = compile/libcompile.a utils/libutils.a
+bin_PROGRAMS = bf_comp
+bf_comp_SOURCES = 
+bf_comp_LDADD = compile/libcompile.a utils/libutils.a

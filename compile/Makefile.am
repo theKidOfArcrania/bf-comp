@@ -18,7 +18,16 @@
 
 noinst_LIBRARIES = libcompile.a
 
-BUILT_SOURCES = bf.h
+BUILT_SOURCES = bf.h bf_lex.h
 AM_YFLAGS = -d
+AM_LFLAGS = --header-file=bf_lex.h
 libcompile_a_CPPFLAGS = -I.. $(WARN_CPPFLAGS)
-libcompile_a_SOURCES = bf.y bf_lex.l ast.c
+libcompile_a_SOURCES = bf.y bf_lex.l ast.c main.c
+MOSTLYCLEANFILES = bf.h bf_lex.h
+
+# Recover from removal of header.
+bf_lex.h: bf_lex.c
+	test -f $@ || rm -f $<
+	test -f $@ || $(MAKE) $(AM_MAKEFLAGS) $<
+
+

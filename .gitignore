@@ -11,3 +11,6 @@ config.status
 **/.deps
 aclocal.m4
 **/test*
+**/.gdb_history
+**/peda-*
+bf_comp

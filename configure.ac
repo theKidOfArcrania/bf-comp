@@ -29,20 +29,26 @@ gl_WARN_ADD([-Werror], [WARN_CPPFLAGS])
 
 # Check for typedefs/structs/etc...
 AC_CHECK_HEADER_STDBOOL
-AC_CHECK_HEADERS([stdlib.h string.h stdio.h errno.h stdarg.h stdint.h stddef.h], [], 
-                 [AC_MSG_ERROR([Couldn't find header])])
+AC_CHECK_HEADERS([stdlib.h string.h stdio.h errno.h stdarg.h stdint.h stddef.h \
+                  fcntl.h libintl.h malloc.h], [], [AC_MSG_ERROR([ \
+                    Couldn't find header])])
 AC_C_INLINE
+AC_TYPE_INT8_T
+AC_TYPE_INT16_T
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
 AC_C_RESTRICT
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 AC_TYPE_UINT8_T
+AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 
 # Check for library functions
 AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_FUNC_ALLOCA
 AC_CHECK_FUNCS([memmove memset strdup strerror strtol], [], 
                [AC_MSG_ERROR([Standard library function not found])])
 

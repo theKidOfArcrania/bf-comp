@@ -23,8 +23,7 @@
 extern "C" {
 #endif
 
-#include <stdarg.h>
-
+#include "utils/loc.h"
 
 #define USE_COLOR
 
@@ -105,38 +104,6 @@ extern "C" {
 
 #endif // USE_COLOR
 
-typedef struct YYLTYPE
-{
-  int first_line;
-  int first_column;
-  int last_line;
-  int last_column;
-  const char* sourceFile;
-} YYLTYPE;
-
-#define LCOPY_BEGIN(dst, src) do {          \
-  const YYLTYPE* __src = &(src);            \
-  (dst).first_line = __src->first_line;     \
-  (dst).first_column = __src->first_column; \
-  (dst).sourceFile = __src->sourceFile;     \
-} while(0)
-#define LCOPY_END(dst, src) do {            \
-  const YYLTYPE* __src = &(src);            \
-  (dst).last_line = __src->last_line;       \
-  (dst).last_column = __src->last_column;   \
-  (dst).sourceFile = __src->sourceFile;     \
-} while(0)
-#define LCOPY(dst, src) do {                \
-  const YYLTYPE* __src = &(src);            \
-  (dst).first_line = __src->first_line;     \
-  (dst).first_column = __src->first_column; \
-  (dst).last_line = __src->last_line;       \
-  (dst).last_column = __src->last_column;   \
-  (dst).sourceFile = __src->sourceFile;     \
-} while(0)
-
-extern YYLTYPE yylloc;
-
 enum msgType {
   MSG_FATAL, MSG_ERROR, MSG_WARNING, MSG_INFO
 };
@@ -147,11 +114,10 @@ int errors();
 int warnings();
 int infos();
 
-#define yyerror(...) printMsg(MSG_ERROR, &(yylloc), __VA_ARGS__)
-#define lfatal(loc, ...) printMsg(MSG_FATAL, &(loc), __VA_ARGS__)
-#define lerror(loc, ...) printMsg(MSG_ERROR, &(loc), __VA_ARGS__)
-#define lwarning(loc, ...) printMsg(MSG_WARNING, &(loc), __VA_ARGS__)
-#define linfo(loc, ...) printMsg(MSG_INFO, &(loc), __VA_ARGS__)
+#define lfatal(loc, ...) printMsg(MSG_FATAL, (loc), __VA_ARGS__)
+#define lerror(loc, ...) printMsg(MSG_ERROR, (loc), __VA_ARGS__)
+#define lwarning(loc, ...) printMsg(MSG_WARNING, (loc), __VA_ARGS__)
+#define linfo(loc, ...) printMsg(MSG_INFO, (loc), __VA_ARGS__)
 #define gfatal(...) printMsg(MSG_FATAL, 0, __VA_ARGS__)
 #define gerror(...) printMsg(MSG_ERROR, 0, __VA_ARGS__)
 #define gwarning(...) printMsg(MSG_WARNING, 0, __VA_ARGS__)
