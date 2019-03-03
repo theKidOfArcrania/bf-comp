@@ -16,7 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 SUBDIRS = compile utils
+AUTOMAKE_OPTIONS = subdir-objects
 
-bin_PROGRAMS = bf_comp
+bin_PROGRAMS = bf_comp bf_interp
 bf_comp_SOURCES = 
 bf_comp_LDADD = compile/libcompile.a utils/libutils.a
+
+bf_interp_SOURCES = interp/bf_interp.c
+bf_interp_LDADD = utils/libutils.a
+bf_interp_CPPFLAGS = $(WARN_CPPFLAGS)
+

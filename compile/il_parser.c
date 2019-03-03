@@ -145,7 +145,7 @@ cstr *compile_il(const struct list_head* ast) {
 do_popctx:
         list_for_each_prev_safe(node2, tmp, &frames) {
           if (frame_ent(node2)->type == FRAME_CTX) {
-            cur_ptr = frame_ent(node2)->ptr;
+            move_ptr(out, &cur_ptr, frame_ent(node2)->ptr);
             list_del(node2);
             free(frame_ent(node2));
             break;

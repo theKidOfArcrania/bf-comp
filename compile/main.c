@@ -62,7 +62,6 @@ int main(int argc, char **argv) {
       goto clean;
     
     puts(s->str);
-    cstr_delete(s);
 
 clean:
     if (s) cstr_delete(s);
