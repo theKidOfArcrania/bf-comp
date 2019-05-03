@@ -27,6 +27,13 @@
 #include "utils/checkmem.h"
 #include "utils/errhand.h"
 
+#define STMT_VAL(t, l, v) ({ \
+  stmt *__s = malloc_c(sizeof(stmt)); \
+  __s->type = (t); \
+  LCOPY(__s->loc, *(l)); \
+  __s->d.ival = (v); \
+  __s; \
+  })
 #define STMT_PTR(t, l, p) ({ \
   stmt *__s = malloc_c(sizeof(stmt)); \
   __s->type = (t); \
@@ -40,6 +47,31 @@
   __s->type = (t); \
   __s; \
   })
+
+char *ch_repeat(int val, int do_wrap, char cneg, char cpos) {
+  int is_neg = 0;
+
+  if (do_wrap) {
+    int pos_val = val & 0xff;
+    int neg_val = 256 - pos_val;
+    if (pos_val < neg_val) {
+      val = pos_val;
+    } else {
+      is_neg = 1;
+      val = neg_val;
+    }
+  } else {
+    if (val < 0) {
+      is_neg = 1;
+      val = -val;
+    }
+  }
+
+  char *ret = malloc_c(val + 1);
+  memset(ret, is_neg ? cneg : cpos, val);
+  ret[val] = 0;
+  return ret;
+}
 
 stmt *stmt_literal(const YYLTYPE* loc, cstr *lit) {
   return STMT_PTR(STMT_LITERAL, loc, lit);
@@ -69,6 +101,15 @@ stmt *stmt_popctx(const YYLTYPE* loc) {
   return STMT_NONE(STMT_POPCTX, loc);
 }
 
+stmt *stmt_limit(const YYLTYPE* loc, uint32_t lim) {
+  return STMT_VAL(STMT_LIMIT, loc, lim);
+}
+
+stmt *stmt_arr_shift(const YYLTYPE* loc, int32_t shift) {
+  return STMT_VAL(STMT_ARR_SHIFT, loc, (uint32_t)shift);
+}
+
+
 void stmt_delete(stmt *s) {
   switch (s->type) {
     case STMT_LITERAL: cstr_delete(s->d.literal); break;
@@ -77,7 +118,9 @@ void stmt_delete(stmt *s) {
     case STMT_ATVAR: free(s->d.ptr); break;
     case STMT_DELVAR: free(s->d.ptr); break;
     case STMT_PUSHCTX:
-    case STMT_POPCTX: break;
+    case STMT_POPCTX: 
+    case STMT_ARR_SHIFT:
+    case STMT_LIMIT: break;
     default: gerror("switch error");
   }
   free(s);
@@ -114,10 +157,11 @@ char *stmts_tmpvar(struct list_head *stmts, const YYLTYPE* loc, int is_zero) {
 }
 
 char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, char *iden) {
-  char *temp1 = nexttmp(), *temp2 = nexttmp();
+  char *temp1, *temp2;
 
-  s_add(stmts, stmt_pushvar, loc, strdup_c(temp1));
-  s_add(stmts, stmt_pushvar, loc, strdup_c(temp2));
+  temp1 = stmts_tmpvar(stmts, loc, 1);
+  temp2 = stmts_tmpvar(stmts, loc, 1);
+
   s_add(stmts, stmt_atvar, loc, iden);
   s_add(stmts, stmt_literal, loc, cstr_new_scp("[-"));
   s_add(stmts, stmt_atvar, loc, strdup_c(temp1));
@@ -133,6 +177,8 @@ char *stmts_var_maketemp(struct list_head *stmts, const YYLTYPE* loc, char *iden
   s_add(stmts, stmt_literal, loc, cstr_new_scp("+"));
   s_add(stmts, stmt_atvar, loc, strdup_c(temp2));
   s_add(stmts, stmt_literal, loc, cstr_new_scp("]"));
+
+  s_add(stmts, stmt_popvar, loc, strdup_c(temp2));
 
   return temp1;
 }

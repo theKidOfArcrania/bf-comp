@@ -27,10 +27,11 @@
 
 #define s_add(s, stmt_fn, ...) list_add_tail(&stmt_fn(__VA_ARGS__)->stmts, (s))
 
+#define UNLIMITED ((uint32_t)-1)
 
 enum stmt_types {
   STMT_LITERAL, STMT_PUSHVAR, STMT_POPVAR, STMT_DELVAR, STMT_ATVAR,
-  STMT_PUSHCTX, STMT_POPCTX
+  STMT_PUSHCTX, STMT_POPCTX, STMT_LIMIT, STMT_ARR_SHIFT
 };
 
 typedef struct stmt {
@@ -45,6 +46,8 @@ typedef struct stmt {
       char *to;
     } iden_tup;
     void *ptr;
+    uint32_t ival;
+    int32_t sval;
   } d;
 
 } stmt;
@@ -54,6 +57,8 @@ typedef struct var {
   char is_temp;
 } var;
 
+char *ch_repeat(int val, int do_wrap, char cneg, char cpos);
+
 stmt *stmt_literal(const YYLTYPE* loc, cstr *lit);
 stmt *stmt_pushvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_delvar(const YYLTYPE* loc, char *iden);
@@ -61,6 +66,9 @@ stmt *stmt_popvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_atvar(const YYLTYPE* loc, char *iden);
 stmt *stmt_pushctx(const YYLTYPE* loc);
 stmt *stmt_popctx(const YYLTYPE* loc);
+stmt *stmt_limit(const YYLTYPE* loc, uint32_t pads);
+stmt *stmt_arr_shift(const YYLTYPE* loc, int32_t shift);
+
 void stmt_delete(stmt *s);
 
 void s_add_literal(struct list_head *stmts, const YYLTYPE* loc, char *iden);

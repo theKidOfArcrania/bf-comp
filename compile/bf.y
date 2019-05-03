@@ -104,8 +104,8 @@ static inline void list_new(struct list_head **phead) {
 
 %token T_EOF 0 "end of file"
 %token T_IF T_THEN T_ELSE T_END T_WHILE T_DIM T_FOR T_TO T_FROM T_TEMP
-%token T_AT T_LET
-%token <num> T_NUM
+%token T_AT T_LET T_LIMIT T_UNLIMIT
+%token <num> T_NUM T_ARR_SHIFT
 %token <str> T_IDEN T_CODE
 
 %type <stmts> stmts stmt
@@ -129,68 +129,87 @@ stmts: stmts stmt {
 stmt: T_CODE {
       list_new(&$$);
       s_add($$, stmt_literal, &@1, cstr_new_smv($1));
-    } | T_IF tmpable T_IDEN T_THEN stmts T_END T_IF {
+    } | T_ARR_SHIFT {
       list_new(&$$);
-
+      s_add($$, stmt_arr_shift, &@1, $1);
+    } | T_IF tmpable T_IDEN T_THEN stmts T_END T_IF {
       char *var = $3;
-      if (!$2)
-        var = stmts_var_maketemp($$, &@3, var);
 
-      // if [var] then { [var] = 0; }
+      list_new(&$$);
+      if (!$2)
+        var = stmts_var_maketemp($$, &@1, var);
+
+      // if [var] then {
       s_add($$, stmt_atvar, &@3, var);
-      s_add($$, stmt_literal, &@3, cstr_new_scp("[[-]")); 
+      s_add($$, stmt_literal, &@3, cstr_new_scp("[")); 
+
       s_add($$, stmt_pushctx, &@3);
       list_splice_tail($5, $$);
       free($5);
       s_add($$, stmt_popctx, &@6);
-      s_add($$, stmt_literal, &@6, cstr_new_scp("]"));
+
+      // [var] = 0; } del [var2]
+      s_add($$, stmt_atvar, &@1, strdup_c(var));
+      s_add($$, stmt_literal, &@1, cstr_new_scp("[-]]"));
+      if (!$2)
+        s_add($$, stmt_popvar, &@1, strdup_c(var));
     } | T_IF tmpable T_IDEN T_THEN stmts T_ELSE stmts T_END T_IF {
-      char *var = $3, *var2;
+      char *var = $3, *flag;
 
       list_new(&$$);
       if (!$2)
-        var = stmts_var_maketemp($$, &@3, var);
+        var = stmts_var_maketemp($$, &@1, var);
 
-      // [var2] = 1
-      var2 = stmts_tmpvar($$, &@3, 1);
+      // [flag] = 1
+      flag = stmts_tmpvar($$, &@1, 1);
       s_add($$, stmt_literal, &@3, cstr_new_scp("+"));
 
-      // if [var] then { [var] = 0; [var2]--; if_stmts; }
+      // if [var] then { if_stmts; [var] = 0; [flag]--; }
       s_add($$, stmt_atvar, &@3, var);
-      s_add($$, stmt_literal, &@3, cstr_new_scp("[[-]")); 
-      s_add($$, stmt_atvar, &@3, var2);
-      s_add($$, stmt_literal, &@3, cstr_new_scp("-")); 
-      s_add($$, stmt_pushctx, &@3);
+      s_add($$, stmt_literal, &@4, cstr_new_scp("[")); 
+      s_add($$, stmt_popvar, &@4, flag); 
+
+      s_add($$, stmt_pushctx, &@4);
       list_splice_tail($5, $$);
       free($5);
       s_add($$, stmt_popctx, &@6);
-      s_add($$, stmt_atvar, &@6, strdup_c(var));
-      s_add($$, stmt_literal, &@6, cstr_new_scp("]"));
-      s_add($$, stmt_delvar, &@6, strdup_c(var));
 
-      // if [var2] { else_stmts; }
-      s_add($$, stmt_atvar, &@6, strdup_c(var2));
+      // [flag] = 0; --- should be same location as previous "flag"
+      flag = stmts_tmpvar($$, &@1, 1);
+
+      // [var] = 0;
+      s_add($$, stmt_atvar, &@6, strdup_c(var));
+      s_add($$, stmt_literal, &@6, cstr_new_scp("[-]]"));
+      //s_add($$, stmt_delvar, &@6, strdup_c(var));
+
+      // if [flag] { else_stmts;
+      s_add($$, stmt_atvar, &@6, flag);
+      s_add($$, stmt_popvar, &@6, strdup_c(flag));
       s_add($$, stmt_literal, &@6, cstr_new_scp("["));
       s_add($$, stmt_pushctx, &@6);
       list_splice_tail($7, $$);
       free($7);
       s_add($$, stmt_popctx, &@6);
-      s_add($$, stmt_literal, &@8, cstr_new_scp("]"));
-      s_add($$, stmt_delvar, &@8, strdup_c(var2));
-    } | T_WHILE tmpable T_IDEN stmts T_END T_WHILE {
-      char *var = $3;
+
+      // [ZERO] }
+      flag = stmts_tmpvar($$, &@6, 0);
+      s_add($$, stmt_atvar, &@6, flag);
+      s_add($$, stmt_literal, &@6, cstr_new_scp("[-]]"));
+      s_add($$, stmt_popvar, &@6, strdup_c(flag));
+      if (!$2)
+        s_add($$, stmt_popvar, &@1, strdup_c(var));
+    } | T_WHILE T_IDEN stmts T_END T_WHILE {
+      char *var = $2;
 
       list_new(&$$);
-      s_add($$, stmt_atvar, &@3, var);
-      s_add($$, stmt_literal, &@3, cstr_new_scp("["));
-      s_add($$, stmt_pushctx, &@3);
-      list_splice_tail($4, $$);
-      free($4);
-      s_add($$, stmt_popctx, &@5);
-      s_add($$, stmt_atvar, &@5, strdup_c(var));
-      s_add($$, stmt_literal, &@5, cstr_new_scp("]"));
-      if ($2)
-        s_add($$, stmt_delvar, &@5, strdup_c(var));
+      s_add($$, stmt_atvar, &@2, var);
+      s_add($$, stmt_literal, &@2, cstr_new_scp("["));
+      s_add($$, stmt_pushctx, &@2);
+      list_splice_tail($3, $$);
+      free($3);
+      s_add($$, stmt_popctx, &@4);
+      s_add($$, stmt_atvar, &@4, strdup_c(var));
+      s_add($$, stmt_literal, &@4, cstr_new_scp("]"));
 
     } | T_FOR T_IDEN T_FROM expr T_TO expr stmts T_END T_FOR {
       lerror(&@1, "For loops not supported yet...");
@@ -207,21 +226,17 @@ stmt: T_CODE {
       list_new(&$$);
       s_add($$, stmt_pushvar, &@2, $2);
     } | T_NUM { 
-      char *ch;
-      int pos = $1 & 0xff; 
-      int neg = 256 - pos;
-      if (pos < neg) {
-        ch = malloc_c(pos + 1);
-        memset(ch, '+', pos);
-        ch[pos] = 0;
-      } else {
-        ch = malloc_c(neg + 1);
-        memset(ch, '-', neg);
-        ch[neg] = 0;
-      }
-
       list_new(&$$);
-      s_add($$, stmt_literal, &@1, cstr_new_smv(ch));
+      s_add($$, stmt_literal, &@1, cstr_new_smv(ch_repeat($1, 1, '-', '+')));
+    } | T_LIMIT T_NUM {
+      list_new(&$$);
+      if ($2 < 0)
+        lerror(&@2, "Invalid limit value");
+      else
+        s_add($$, stmt_limit, &@1, $2);
+    } | T_UNLIMIT {
+      list_new(&$$);
+      s_add($$, stmt_limit, &@1, -1);
     }
     ;
 

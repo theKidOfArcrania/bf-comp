@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
 
   while (1) {
     int error_before = errors();
-    cstr *s = NULL;
+    cstr *s = NULL, *t = NULL;
 
     if (!parse_bfc(&penv))
       break;
@@ -56,15 +56,17 @@ int main(int argc, char **argv) {
     if (error_before != errors())
       goto clean;
 
-    dump_il(penv.ast, stdout);
+    //dump_il(penv.ast, stdout);
     s = compile_il(penv.ast);
     if (error_before != errors())
       goto clean;
     
-    puts(s->str);
+    t = optimize(s);
+    puts(t->str);
 
 clean:
     if (s) cstr_delete(s);
+    if (t) cstr_delete(t);
     if (penv.ast) stmts_delete(penv.ast);
   }
 

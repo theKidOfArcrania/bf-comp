@@ -26,5 +26,6 @@ typedef struct _IO_FILE FILE;
 
 cstr *compile_il(const struct list_head* ast);
 void dump_il(const struct list_head *ast, FILE *out);
+cstr *optimize(cstr *in);
 
 #endif

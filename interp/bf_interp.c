@@ -87,6 +87,13 @@ static cstr *read_bf(const char *file) {
   return out;
 }
 
+static char getnchar() {
+  int x = getchar();
+  if (x == -1)
+    x = 0;
+  return (char)x;
+}
+
 #define TAPE_SIZE 0x1000
 #define TAPE_MASK (TAPE_SIZE - 1)
 static void exec_bf(const cstr *scode) {
@@ -138,7 +145,7 @@ static void exec_bf(const cstr *scode) {
         }
         break;
       case T_ENDLOOP: pc = *(sp--); goto no_pc;
-      case T_INPUT: (*tp) = getchar(); break;
+      case T_INPUT: (*tp) = getnchar(); break;
       case T_OUTPUT: putchar(*tp); break;
     }
     pc++;

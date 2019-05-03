@@ -78,6 +78,68 @@ static void move_ptr(cstr *out, uint32_t *cur_ptr, uint32_t to) {
   }
 }
 
+static cstr *optimize_repeat(const cstr *in) {
+
+#define update(out, val, do_wrap, cneg, cpos) do { \
+  char *__ch = ch_repeat((val), (do_wrap), (cneg), (cpos)); \
+  cstr_append_s((out), __ch); \
+  free(__ch); \
+  (val) = 0; \
+} while(0);
+
+  cstr *out = cstr_new_i(in->length);
+
+  size_t i;
+  int shift = 0, was_add = 0, was_shift = 0, is_add, is_shift;
+  char add = 0;
+  for (i = 0; i < in->length; i++) {
+    is_add = is_shift = 0;
+    switch (in->str[i]) {
+      case '-':
+        is_add = 1;
+        add--;
+        break;
+      case '+':
+        is_add = 1;
+        add++;
+        break;
+      case '<':
+        is_shift = 1;
+        shift--;
+        break;
+      case '>':
+        is_shift = 1;
+        shift++;
+    }
+
+    if (!is_add && was_add)
+      update(out, add, 1, '-', '+');
+
+    if (!is_shift && was_shift)
+      update(out, shift, 0, '<', '>');
+
+    was_shift = is_shift;
+    was_add = is_add;
+
+    if (!is_add && !is_shift)
+      cstr_append_c(out, in->str[i]);
+  }
+
+  if (was_add)
+    update(out, add, 1, '-', '+');
+
+  if (was_shift)
+    update(out, shift, 0, '<', '>');
+
+  return out;
+#undef update
+}
+
+cstr *optimize(const cstr *in) {
+  return optimize_repeat(in);
+}
+
+
 cstr *compile_il(const struct list_head* ast) {
   map_t sym_table = hashmap_new();
   LIST_HEAD(frames);
@@ -87,7 +149,7 @@ cstr *compile_il(const struct list_head* ast) {
   struct frame_ele *t_frame;
   stmt *s;
 
-  uint32_t cur_ptr = 0, next_empty = 0;
+  uint32_t cur_ptr = 0, next_empty = 0, limit = UNLIMITED;
 
   list_for_each(node, ast) {
     s = stmt_ent(node);
@@ -101,6 +163,8 @@ cstr *compile_il(const struct list_head* ast) {
           break;
         }
 
+        if (next_empty >= limit)
+          lerror(&s->loc, "Var definition passes limit of %d", limit);
         t_frame = push_var(&frames, s->d.iden, &next_empty);
         hashmap_put(sym_table, t_frame->iden, t_frame);
         break;
@@ -154,6 +218,17 @@ do_popctx:
           ASSERT(pop_var(node2, NULL, &next_empty));
         }
         break;
+      case STMT_LIMIT:
+        limit = s->d.ival;
+        if (limit < next_empty)
+          lerror(&s->loc, "New limit is already exceeded");
+        break;
+      case STMT_ARR_SHIFT:
+        if (limit == UNLIMITED)
+          lerror(&s->loc, "Must specify a limit to do array shifts!");
+        else
+          cstr_append_s(out, ch_repeat(s->d.sval * (int32_t)limit, 0, '<', '>'));
+        break;
       default: 
         gfatal("switch error");
     }
@@ -188,6 +263,8 @@ void dump_il(const struct list_head *ast, FILE *out) {
       case STMT_ATVAR: fprintf(out, "STMT_ATVAR(%s)\n", s->d.iden); break;
       case STMT_PUSHCTX: fprintf(out, "STMT_PUSHCTX\n"); break;
       case STMT_POPCTX: fprintf(out, "STMT_POPCTX\n"); break;
+      case STMT_LIMIT: fprintf(out, "STMT_LIMIT(%d)\n", s->d.ival); break;
+      case STMT_ARR_SHIFT: fprintf(out, "STMT_ARR_SHIFT(%d)\n", s->d.sval); break;
       default: gfatal("switch error");
     }
   }
